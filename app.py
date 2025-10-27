@@ -1,10 +1,9 @@
 import streamlit as st
 import json, os, dotenv
 from openai import Client
-from core.predict_ctg import load_ctg_model
 from core.extractors import extract_ctg_from_pdf, extract_epl_from_pdf
 from core.embeddings import load_embedding_model, precompute_doc_embeddings
-from core.run_system import run_risk_system
+from core.predictors import run_risk_system, load_ctg_model
 from core.llm_utils import llm_generate
 
 dotenv.load_dotenv()
@@ -15,10 +14,11 @@ st.set_page_config(page_title="EPL & CTG Risk", layout="wide")
 st.title("🍼 Early Pregnancy Loss (EPL) Risk Assessment")
 
 # Load models
-ctg_model = load_ctg_model()
-advice_docs = [json.loads(line) for line in open("data/advices.jsonl", "r")]
-tokenizer, emb_model = load_embedding_model()
-doc_embeddings = precompute_doc_embeddings(advice_docs, emb_model, tokenizer)
+ctg_model = st.cache_resource(load_ctg_model)()
+with open('data/advices.jsonl') as f:
+    advice_docs = json.loads(f.read())
+tokenizer, emb_model = st.cache_resource(load_embedding_model)()
+doc_embeddings = st.cache_resource(precompute_doc_embeddings)(advice_docs, emb_model, tokenizer)
 
 # Sidebar for PDF upload
 with st.sidebar:
