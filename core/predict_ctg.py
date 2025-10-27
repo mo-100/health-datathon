@@ -1,6 +1,7 @@
 import numpy as np
 import xgboost as xgb
-
+# another algorithms 
+############
 ctg_class_map = {0: "Normal", 1: "Suspect", 2: "Pathological"}
 
 def load_ctg_model(model_path="models/fetal_xgb_model.json"):
