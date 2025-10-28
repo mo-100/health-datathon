@@ -2,18 +2,39 @@ import numpy as np
 import tabpfn
 import shap
 import pandas as pd
+import xgboost as xgb
+import pickle
 
 from core.embeddings import compute_embedding
-from core.llm_utils import llm_generate
+from core.llm_utils import llm_generate, safe_parse_json
 
-# ------------------ CTG
+# ------------------ model loaders
 
-def load_ctg_model(model_path="models/tabpfn_model.tabpfn_fit"):
+def load_tabpfn(model_path):
     model = tabpfn.TabPFNClassifier()
     model.load_from_fit_state(model_path)
     return model
 
+def load_xgboost(model_path):
+    model = xgb.XGBClassifier()
+    model.load_model(model_path)
+    return model
 
+def load_pickle(model_path):
+    with open(model_path, 'rb') as f:
+        return pickle.load(f)
+
+def load_ctg_model():
+    model = load_pickle('ml/models/random_forest_model_stillbirth.pkl')
+    return model
+
+def load_miscarriage_model():
+    model = load_pickle('ml/models/random_forest_model_miscarriage.pkl')
+    return model
+
+def load_early_fetal_loss_model():
+    model = load_pickle('')
+    return model
 
 def predict_ctg(model, patient_data):
     class_map = {0: "Normal", 1: "Suspect", 2: "Pathological"}
@@ -67,72 +88,52 @@ def predict_ctg(model, patient_data):
         "recommendations": recommendations
     }
 
-# ------------------ EPL
+def predict_miscarriage(model, patient_data):
+    class_map = {0: "Normal", 1: "High Risk"}
+    # 1️⃣ Predict probabilities and class
+    probs = model.predict_proba(patient_data)[0]
+    pred_class_idx = int(np.argmax(probs))
+    pred_class_name = class_map[pred_class_idx]
 
-def predict_epl(MA, EM, GSD, EL, YSD, EHR):
-    score = 0
-    reasons = []
+    # 2️⃣ Compute SHAP values for this patient
+    explainer = shap.Explainer(model.predict_proba, patient_data)
 
-    if MA < 30:
-        pass
-    elif 30 <= MA < 35:
-        score += 1
-        reasons.append("Maternal age 30–34 slightly increases EPL risk.")
-    elif 35 <= MA < 40:
-        score += 2
-        reasons.append("Maternal age 35–39 moderately increases EPL risk.")
-    else:
-        score += 3
-        reasons.append("Maternal age ≥40 strongly increases EPL risk.")
+    shap_values = explainer(patient_data)
+    shap_vals_for_class = shap_values[:, :, pred_class_idx].values[0]
 
-    if EM >= 9:
-        pass
-    elif 7 <= EM < 9:
-        score += 1
-        reasons.append("Endometrium 7–8.9 mm shows borderline receptivity.")
-    else:
-        score += 2
-        reasons.append("Endometrium <7 mm indicates poor uterine lining.")
+    # 3️⃣ Create a dataframe for features and SHAP values
+    feature_df = pd.DataFrame({
+        "feature": patient_data.columns,
+        "shap_value": shap_vals_for_class,
+        "feature_value": patient_data.iloc[0].values
+    }).sort_values(by="shap_value", key=abs, ascending=False)
 
-    if GSD >= 18:
-        pass
-    elif 14 <= GSD < 18:
-        score += 1
-        reasons.append("GSD 14–17.9 mm slightly smaller than expected.")
-    else:
-        score += 2
-        reasons.append("GSD <14 mm suggests delayed growth.")
+    # 4️⃣ Top 3 most important features
+    top_features = feature_df.head(3)
 
-    if EL >= 3:
-        pass
-    elif 1.5 <= EL < 3:
-        score += 1
-        reasons.append("Embryo length 1.5–2.9 mm indicates slower growth.")
-    else:
-        score += 2
-        reasons.append("Embryo length <1.5 mm indicates poor development.")
+    # 5️⃣ Generate recommendations based on SHAP values and class
+    recommendations = []
+    for idx, row in top_features.iterrows():
+        feature, value, shap_val = row['feature'], row['feature_value'], row['shap_value']
+        if pred_class_name == "Normal":
+            # Positive features reassuring
+            if shap_val > 0:
+                recommendations.append(f"{feature} ({value}) supports normal fetal health.")
+            else:
+                recommendations.append(f"{feature} ({value}) slightly reduces reassurance, monitor routinely.")
+        elif pred_class_name == "High Risk":
+            if shap_val > 0:
+                recommendations.append(f"{feature} ({value}) increases risk; closer monitoring recommended.")
+            else:
+                recommendations.append(f"{feature} ({value}) reduces risk, but patient still at suspect level.")
 
-    if not (3 <= YSD <= 4):
-        score += 1
-        reasons.append("Abnormal yolk sac size increases risk.")
-
-    if EHR >= 100:
-        pass
-    elif 60 <= EHR < 100:
-        score += 1
-        reasons.append("Heart rate 60–99 bpm may indicate distress.")
-    else:
-        score += 2
-        reasons.append("Heart rate <60 bpm predicts EPL.")
-    
-    prob = 1 / (1 + np.exp(-(0.35 * score - 2.5)))
-    
-    if score > 5:
-        risk_level = "High"
-    else:
-        risk_level = "Low"
-
-    return {"score": score, "risk": round(prob, 2), "risk_level": risk_level, "reasons": reasons}
+    # 6️⃣ Output
+    return {
+        "predicted_class": pred_class_name,
+        "predicted_probabilities": probs,
+        "top_features": top_features,
+        "recommendations": recommendations
+    }
 
 # ------------------ RISK SYSTEMS
 BASE_PROMPT = f"""
@@ -142,32 +143,45 @@ Use the provided references to back up your recommendations.
 OUTPUT FORMAT:
 ```json
 {{
-  "classification": "<predicted class or risk level>",
-  "confidence": <predicted probability or score>,
+  "classification": "<predicted class>",
+  "confidence": <predicted probability (0-100)>,
   "reason": "<brief summary of the patient's condition and reasons why this classification was made>",
   "recommendations": [
     {{
-        "advice": "<recommendation>",
-        "source": "<source reference>"
+        "advice": "<advice to do (if this then do this)>",
+        "source": "<(book and page)>"
+    }},
+    {{
+        "advice": "<advice to do (if this then do this)>",
+        "source": "<(book and page)>"
+    }},
+    {{
+        "advice": "<advice to do (if this then do this)>",
+        "source": "<(book and page)>"
     }}
-    ...
   ]
 }}
 ```
 """
 
 def run_risk_system_ctg(top_advices, ctg_pred, client):
-    references = "\n".join([f"[{i+1}] {d['advice']} (Source: {d['source']})" for i, d in enumerate(top_advices)])
-    prompt = f"Clinical summary:\nCTG: {ctg_pred}\nReferences:\n{references}"
+    references = "\n".join([f"{d['advice']} (Source: {d['source']}, Page: {d['page_number']})" for i, d in enumerate(top_advices)])
+    input_prompt = f"Clinical summary:\nCTG Result: {ctg_pred}\nReferences:\n{references}"
+    prompt = "\n".join([BASE_PROMPT, input_prompt])
+    print(f"-------------------\nPROMPT:\n{prompt} ")
 
     llm_text = llm_generate(prompt, client)
-    return {"CTG": {"class": ctg_pred}, "Recommendations": llm_text}
+    json_response = safe_parse_json(llm_text)
+    return json_response
 
 
 
-def run_risk_system_epl(top_advices, epl_result, client):
-    references = "\n".join([f"[{i+1}] {d['advice']} (Source: {d['source']})" for i, d in enumerate(top_advices)])
-    prompt = f"Clinical summary:\nEPL Risk: {epl_result['risk']}\nReferences:\n{references}"
+def run_risk_system_miscarriage(top_advices, miscarriage_result, client):
+    references = "\n".join([f"{d['advice']} (Source: {d['source']}, Page: {d['page_number']})" for i, d in enumerate(top_advices)])
+    input_prompt = f"Clinical summary:\nMiscarriage Result: {miscarriage_result}\nReferences:\n{references}"
+    prompt = "\n".join([BASE_PROMPT, input_prompt])
+    print(f"-------------------\nPROMPT:\n{prompt} ")
 
     llm_text = llm_generate(prompt, client)
-    return {"EPL": epl_result, "Recommendations": llm_text}
+    json_response = safe_parse_json(llm_text)
+    return json_response

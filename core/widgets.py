@@ -12,8 +12,10 @@ def render_report_dashboard(report_data, test_type="CTG"):
     recommendations = report_data.get("recommendations", [])
 
     # ---- Classification Display ----
-    st.markdown(f"### 🧠 Classification Result: **{classification}**")
-
+    if classification in {"Normal"}:
+        st.markdown(f"### 🧠 Classification Result: **🟢 {classification}**")
+    else:
+        st.markdown(f"### 🧠 Classification Result: **🔴 {classification}**")
     # ---- Confidence Chart ----
     st.markdown("### 🎯 Model Confidence")
 
@@ -23,11 +25,11 @@ def render_report_dashboard(report_data, test_type="CTG"):
         number={'suffix': "%"},
         gauge={
             'axis': {'range': [0, 100]},
-            'bar': {'color': "#1f77b4"},
+            'bar': {'color': "rgba(0, 0, 0, 0.8)"},
             'steps': [
-                {'range': [0, 40], 'color': '#ffcccc'},
-                {'range': [40, 70], 'color': '#fff5cc'},
-                {'range': [70, 100], 'color': '#ccffcc'}
+                {'range': [0, 40], 'color': '#33691E'},
+                {'range': [40, 80], 'color': '#FFEB3B'},
+                {'range': [80, 100], 'color': '#B71C1C'}
             ],
         }
     ))
