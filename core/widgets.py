@@ -1,17 +1,8 @@
 import streamlit as st
 from core.model_viewer import render_3d_model
 
-def _color_for_value(p: int) -> str:
-    if p <= 30:
-        return "#ef5350"  # red
-    if p <= 70:
-        return "#fbc02d"  # amber
-    return "#66bb6a"      # green
-
-def progress_bar(PROGRESS_VALUE):
-    value = int(PROGRESS_VALUE)
-    value = min(max(value, 0), 100)  # Clamp between 0 and 100
-    bar_color = _color_for_value(value)
+def progress_bar(PROGRESS_VALUE, bar_color):
+    value = min(max(int(PROGRESS_VALUE), 0), 100)  # Clamp value between 0 and 100
 
     # Dark mode centered progress bar
     bar_html = f"""
@@ -52,22 +43,7 @@ def progress_bar(PROGRESS_VALUE):
                         transition:width 0.4s ease;
                     '></div>
                 </div>
-                <div style='
-                    min-width:64px;
-                    text-align:right;
-                    font-weight:700;
-                    color:#f5f5f5;
-                '>{value}%</div>
             </div>
-        </div>
-        <div style='
-            margin-top:10px;
-            font-size:13px;
-            color:#aaa;
-        '>
-            <span style='color:#ef5350;'>●</span> 0–30 (low) &nbsp;&nbsp;
-            <span style='color:#fbc02d;'>●</span> 31–70 (medium) &nbsp;&nbsp;
-            <span style='color:#66bb6a;'>●</span> 71–100 (high)
         </div>
     </div>
     """
@@ -99,18 +75,16 @@ def render_report_dashboard(report_data, test_type="CTG"):
     else:
         render_3d_model(model_path="3D_model/pregnancy_woman.glb", risk_level=0)
 
-    st.markdown(
-        """
-        <div style='text-align:center; margin-top:20px;'>
-            <h3>🎯 Model Confidence</h3>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    # st.markdown(
+    #     """
+    #     <div style='text-align:center; margin-top:20px;'>
+    #         <h3>Risk Level</h3>
+    #     </div>
+    #     """,
+    #     unsafe_allow_html=True
+    # )
 
-    progress_bar(confidence)
-    st.markdown(f"<h3 style='text-align:center; color:#f5f5f5;'>{confidence:.1f}%</h3>", unsafe_allow_html=True)
-
+    progress_bar(confidence, color)
     st.markdown("### 💬 Reasons for Classification")
     st.info(reason)
 
