@@ -53,7 +53,7 @@ def _start_static_server(path, port=8504):
 def render_3d_model(
     model_path,
     risk_level,
-    height=550,
+    height=200,
     show_debug=False,
     custom_colors=None,
     custom_labels=None,
@@ -179,8 +179,8 @@ def render_3d_model(
                 const colorHex = '{color}';
 
                             // ========== LIGHT OPTIONS===========
-            const SPOTLIGHT_WIDTH = 550;      // Width of spotlight (px) - increase for wider light
-            const SPOTLIGHT_HEIGHT = 600;     // Height of spotlight (px) - increase for taller light
+            const SPOTLIGHT_WIDTH = 200;      // Width of spotlight (px) - increase for wider light
+            const SPOTLIGHT_HEIGHT = 250;     // Height of spotlight (px) - increase for taller light
             const POSITION_X = 50;            // Horizontal position (%) - 50 = center, adjust left/right
             const POSITION_Y = 50;            // Vertical position (%) - 55 = slightly below center (stomach)
             const OPACITY_CENTER = 220;        // Center opacity (0-100) - higher = brighter center

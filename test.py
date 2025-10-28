@@ -1,5 +1,5 @@
 import streamlit as st
-from model_viewer import render_3d_model
+from core.model_viewer import render_3d_model
 
 # Info section
 st.write(
@@ -15,5 +15,5 @@ st.write(
 # Render the 3D model with risk visualization
 render_3d_model(
     model_path="3D_model/pregnancy_woman.glb",
-    risk_level=2,
+    risk_level=1,
 )

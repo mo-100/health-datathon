@@ -12,10 +12,10 @@ def safe_parse_json(text):
     raise ValueError("Failed to parse LLM JSON output.")
 
 
-def llm_generate(prompt, client, model="qwen/qwen3-vl-30b-a3b-thinking"):
+def llm_generate(prompt, client, model="openai/gpt-oss-120b", temp=0.2):
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": [{"type": "text", "text": prompt}]}],
-        temperature=0.7,
+        temperature=temp,
     )
     return response.choices[0].message.content

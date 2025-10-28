@@ -1,5 +1,5 @@
 import streamlit as st
-import plotly.graph_objects as go
+from core.model_viewer import render_3d_model
 
 def render_report_dashboard(report_data, test_type="CTG"):
     st.markdown("---")
@@ -11,36 +11,38 @@ def render_report_dashboard(report_data, test_type="CTG"):
     reason = report_data.get("reason", "No details provided.")
     recommendations = report_data.get("recommendations", [])
 
-    # ---- Classification Display ----
-    if classification in {"Normal"}:
-        st.markdown(f"### 🧠 Classification Result: **🟢 {classification}**")
-    else:
-        st.markdown(f"### 🧠 Classification Result: **🔴 {classification}**")
-    # ---- Confidence Chart ----
-    st.markdown("### 🎯 Model Confidence")
+    # ---- Big Centered Classification ----
+    is_risk = classification.lower() != "normal"
+    color = "#2E7D32" if not is_risk else "#C62828"
 
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=confidence,
-        number={'suffix': "%"},
-        gauge={
-            'axis': {'range': [0, 100]},
-            'bar': {'color': "rgba(0, 0, 0, 0.8)"},
-            'steps': [
-                {'range': [0, 40], 'color': '#33691E'},
-                {'range': [40, 80], 'color': '#FFEB3B'},
-                {'range': [80, 100], 'color': '#B71C1C'}
-            ],
-        }
-    ))
-
-    fig.update_layout(
-        height=250,
-        margin=dict(l=40, r=40, t=60, b=30),  # added top margin
-        font=dict(size=16)
+    st.markdown(
+        f"""
+        <div style='text-align:center; margin-top:30px;'>
+            <h1 style='color:{color}; font-size:60px; font-weight:800; margin-bottom:0;'>{classification}</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    # ---- 3D Model (Centered Below Classification) ----
+    # st.markdown("<div style='display:flex; justify-content:center; margin-top:10px;'>", unsafe_allow_html=True)
+    if is_risk:
+        render_3d_model(model_path="3D_model/pregnancy_woman.glb", risk_level=2)
+    else:
+        render_3d_model(model_path="3D_model/pregnancy_woman.glb", risk_level=0)
+    # st.markdown("</div>", unsafe_allow_html=True)
+
+    # ---- Confidence (Below 3D Model) ----
+    st.markdown(
+        """
+        <div style='text-align:center; margin-top:20px;'>
+            <h3>🎯 Model Confidence</h3>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.progress(confidence / 100)
+    st.markdown(f"<h3 style='text-align:center;'>{confidence:.1f}%</h3>", unsafe_allow_html=True)
 
     # ---- Reasons ----
     st.markdown("### 💬 Reasons for Classification")

@@ -171,6 +171,7 @@ def run_risk_system_ctg(top_advices, ctg_pred, client):
     print(f"-------------------\nPROMPT:\n{prompt} ")
 
     llm_text = llm_generate(prompt, client)
+    print(f"LLM RESPONSE:\n{llm_text}")
     json_response = safe_parse_json(llm_text)
     return json_response
 
@@ -183,5 +184,6 @@ def run_risk_system_miscarriage(top_advices, miscarriage_result, client):
     print(f"-------------------\nPROMPT:\n{prompt} ")
 
     llm_text = llm_generate(prompt, client)
+    print(f"LLM RESPONSE:\n{llm_text}")
     json_response = safe_parse_json(llm_text)
     return json_response
