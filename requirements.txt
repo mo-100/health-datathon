@@ -17,6 +17,7 @@ requests
 streamlit
 PyPDF2
 python-dotenv
+reportlab
 
 ipykernel
 jupyter
